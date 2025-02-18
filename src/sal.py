@@ -2,9 +2,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class Model(nn.Module):
+class SAL(nn.Module):
     def __init__(self, num_points=16):
-        super(Model, self).__init__()
+        super(SAL, self).__init__()
         self.num_points = num_points
 
         # Convolutional layers using Sequential
