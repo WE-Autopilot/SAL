@@ -176,31 +176,64 @@ class PurePursuitPlanner:
                                     delimiter=conf.wpt_delim,
                                     skiprows=conf.wpt_rowskip)
 
-    # TODO: Make a utility function that converts between the path vector from SAL and  global waypoints
-
-    def set_path(self, wpts_vector):
+    def convert_to_global_waypoints(rel_waypoints, start_x, start_y, scale=1.0, rotation=0.0):
         """
-        Accepts a (32,) numpy array of x,y coordinates,
-        reshapes it to (16,2), and overrides self.waypoints 
-        with a 3-column array [x, y, speed=1.0].
-        
-        Once this is called, the CSV data is effectively ignored.
+        Convert a relative path vector to global waypoints.
+
+        Parameters:
+        - rel_waypoints: np.ndarray, shape (N,2), relative x, y positions
+        - start_x: float, global starting x position
+        - start_y: float, global starting y position
+        - scale: float, scaling factor applied to waypoints
+        - rotation: float, rotation angle in radians (counterclockwise)
+
+        Returns:
+        - global_waypoints: np.ndarray, shape (N,2), global x, y positions
         """
-        
-        # Reshape the flat array (32,) to (16,2)
-        new_xy = wpts_vector.reshape((16, 2))
+        if rel_waypoints.ndim != 2 or rel_waypoints.shape[1] != 2:
+            raise ValueError("rel_waypoints must have shape (N,2)")
 
-        '''
-        If we want to use a third speed column
-        new_wpts = np.zeros((16, 3))
-        new_wpts[:, 0:2] = new_xy
-        new_wpts[:, 2] = 1.0
+        # Apply scaling
+        scaled_waypoints = rel_waypoints * scale
 
-        self.waypoints = new_wpts
-        '''
-        
-        # Override the CSV-based waypoints with just x,y
-        self.waypoints = new_xy
+        # Apply cumulative summation to get absolute positions
+        cumsum_waypoints = np.cumsum(scaled_waypoints, axis=0)
+
+        # Apply rotation using rotation matrix
+        cos_theta, sin_theta = np.cos(rotation), np.sin(rotation)
+        rotation_matrix = np.array([[cos_theta, -sin_theta], [sin_theta, cos_theta]])
+
+        rotated_waypoints = cumsum_waypoints @ rotation_matrix.T
+
+        # Translate to global coordinates
+        global_waypoints = rotated_waypoints + np.array([start_x, start_y])
+
+        return global_waypoints
+
+    def set_path(self, wpts_vector, scale=1.0, rotation=0.0):
+        """
+        Accepts a numpy array of relative x, y coordinates, reshapes them, 
+        converts them to global waypoints, and overrides self.waypoints.
+
+        Parameters:
+        - wpts_vector: np.ndarray, shape (N*2,), relative x,y positions in a flat vector.
+        - scale: float, scaling factor applied to waypoints.
+        - rotation: float, rotation angle in radians (counterclockwise).
+        """
+        # Reshape the flat array to (N,2)
+        rel_waypoints = wpts_vector.reshape((-1, 2))
+
+        # Convert to global waypoints
+        global_waypoints = convert_to_global_waypoints(
+            rel_waypoints, 
+            self.conf.sx, self.conf.sy,  # Start position from config.yaml
+            scale=scale, 
+            rotation=rotation
+        )
+
+        # Store the new waypoints
+        self.waypoints = global_waypoints
+
     
     def render_waypoints(self, e):
         """

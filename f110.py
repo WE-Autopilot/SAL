@@ -22,6 +22,21 @@ def main(render_on=True):
     conf = Namespace(**conf_dict)
 
     planner = PurePursuitPlanner(conf, wheelbase=(0.17145 + 0.15875))
+    
+    # Example relative waypoints (e.g., a simple track)
+    rel_wpts = np.array([
+        [1, 0], [2, 1], [3, 2], [4, 2], [5, 1], 
+        [5, -1], [4, -2], [3, -2], [2, -1], [1, 0]
+    ]).flatten()  # Flatten to a 1D array as expected
+
+    scale_factor = 1.5
+    rotation_angle = np.radians(30)  # Convert 30 degrees to radians
+
+    # Set the path using relative waypoints
+    planner.set_path(rel_wpts, scale=scale_factor, rotation=rotation_angle)
+
+    print("Waypoints set successfully in global coordinates:")
+    print(planner.waypoints)
 
     # Optional rendering callback
     def render_callback(env_renderer):
