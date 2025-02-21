@@ -1,6 +1,11 @@
 import os
 import numpy as np
+
 from numba import njit
+from pyglet.gl import GL_POINTS, glPointSize
+
+
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 """
 Pure Pursuit Helper Functions
@@ -158,6 +163,10 @@ class PurePursuitPlanner:
         self.max_reacquire = 20.0  # maximum reacquire distance
         self.drawn_waypoints = []
         
+        # Default pure pursuit parameters
+        self.tlad = 0.8246   # Lookahead distance (tlad)
+        self.vgain = 0.9034  # Velocity gain (vgain)
+
         self._latest_speed = 0.0
         self._latest_steering_angle = 0.0
         self._current_segment_index = None
@@ -167,7 +176,7 @@ class PurePursuitPlanner:
         """
         Load waypoints from file.
         """
-        waypoint_file = os.path.join(os.path.dirname(__file__), "assets", os.path.basename(conf.wpt_path))
+        waypoint_file = os.path.join(ROOT_DIR, "assets", os.path.basename(conf.wpt_path))
 
         if not os.path.exists(waypoint_file):
             raise FileNotFoundError(f"Waypoint file not found: {waypoint_file}")
@@ -176,6 +185,7 @@ class PurePursuitPlanner:
                                     delimiter=conf.wpt_delim,
                                     skiprows=conf.wpt_rowskip)
 
+    @staticmethod
     def convert_to_global_waypoints(rel_waypoints, start_x, start_y, scale=1.0, rotation=0.0):
         """
         Convert a relative path vector to global waypoints.
@@ -214,68 +224,114 @@ class PurePursuitPlanner:
         """
         Accepts a numpy array of relative x, y coordinates, reshapes them, 
         converts them to global waypoints, and overrides self.waypoints.
-
-        Parameters:
-        - wpts_vector: np.ndarray, shape (N*2,), relative x,y positions in a flat vector.
-        - scale: float, scaling factor applied to waypoints.
-        - rotation: float, rotation angle in radians (counterclockwise).
         """
+        self.drawn_waypoints.clear()  # Clear old waypoints before setting new ones
+
         # Reshape the flat array to (N,2)
         rel_waypoints = wpts_vector.reshape((-1, 2))
 
-        # Convert to global waypoints
-        global_waypoints = convert_to_global_waypoints(
+        # Convert to global waypoints using tip-to-tail transformation
+        global_waypoints = self.convert_to_global_waypoints(
             rel_waypoints, 
             self.conf.sx, self.conf.sy,  # Start position from config.yaml
             scale=scale, 
             rotation=rotation
         )
 
-        # Store the new waypoints
-        self.waypoints = global_waypoints
+        # Keep only 16 waypoints at a time
+        self.waypoints = global_waypoints[:16]
 
-    
+        print("New waypoints set:\n", self.waypoints)
+
     def render_waypoints(self, e):
         """
-        Update waypoints being drawn by EnvRenderer.
+        Render waypoints dynamically, loading new sets when all 16 waypoints are used.
         """
-        from pyglet.gl import GL_POINTS  # import here to avoid issues if not rendering
-        points = np.vstack(
-            (
-                self.waypoints[:, self.conf.wpt_xind],
-                self.waypoints[:, self.conf.wpt_yind]
-            )
-        ).T
+
+        if self.waypoints is None or self.waypoints.shape[0] == 0:
+            print("No waypoints available for rendering.")
+            return
+
+        print(f"Rendering {len(self.waypoints)} waypoints...")
+
+        # Ensure waypoints array has at least (x, y)
+        if self.waypoints.shape[1] < 2:
+            raise ValueError(f"Waypoints array must have at least (x, y) columns, but got shape {self.waypoints.shape}")
+
+        # Use only the first two columns (x, y)
+        points = self.waypoints[:16, :2]
+
+        # Scale for rendering
         scaled_points = 50.0 * points
 
-        for i in range(points.shape[0]):
-            if len(self.drawn_waypoints) < points.shape[0]:
+        glPointSize(10)  # Increase point size
+
+        # Draw or update waypoints
+        for i in range(len(points)):
+            if len(self.drawn_waypoints) < len(points):
+                print(f"Adding waypoint {i}: {scaled_points[i]}")
                 b = e.batch.add(
                     1,
                     GL_POINTS,
                     None,
                     ('v3f/stream', [scaled_points[i, 0], scaled_points[i, 1], 0.0]),
-                    ('c3B/stream', [183, 193, 222])
+                    ('c3B/stream', [255, 0, 0])  # Red color
                 )
                 self.drawn_waypoints.append(b)
             else:
+                print(f"Updating waypoint {i}: {scaled_points[i]}")
                 self.drawn_waypoints[i].vertices = [
                     scaled_points[i, 0],
                     scaled_points[i, 1],
                     0.0
                 ]
 
+        # Detect when all waypoints are used and load a new set
+        if hasattr(self, "waypoint_index"):
+            self.waypoint_index += 1
+        else:
+            self.waypoint_index = 1
+
+        if self.waypoint_index % 16 == 0:  # Every 16 waypoints, generate a new set
+            print("Generating new waypoints...")
+            self.load_new_waypoints()
+
+    def load_new_waypoints(self):
+        """
+        Refresh the waypoints dynamically, either from CSV or randomly generated.
+        """
+        if self.use_csv:
+            # Load next 16 waypoints from the CSV file
+            start_idx = (self.waypoint_index // 16) * 16
+            end_idx = start_idx + 16
+            if end_idx > self.waypoints.shape[0]:  # Loop back if needed
+                start_idx = 0
+                end_idx = 16
+            self.waypoints = self.waypoints[start_idx:end_idx, :2]
+            print(f"Loaded next 16 waypoints from CSV (indices {start_idx}-{end_idx})")
+        else:
+            # Generate new random waypoints to simulate SAL input
+            num_waypoints = 16
+            max_distance = 2.0  # Max distance each waypoint can be from the previous one
+            random_offsets = np.random.uniform(-max_distance, max_distance, (num_waypoints, 2))
+            self.waypoints = random_offsets
+            print("Generated new set of random waypoints.")
+
     def _get_current_waypoint(self, waypoints, lookahead_distance, position, theta):
         """
         Gets the current waypoint to follow.
         """
-        wpts = np.vstack((waypoints[:, self.conf.wpt_xind],
-                          waypoints[:, self.conf.wpt_yind])).T
+        if waypoints.shape[1] >= 2:
+            wpts = waypoints[:, :2]  # Only take (x, y) columns
+        else:
+            raise ValueError(f"Waypoints array has invalid shape {waypoints.shape}, expected at least 2 columns (x, y).")
 
         nearest_point_, nearest_dist, t, i = nearest_point_on_trajectory(position, wpts)
 
         self._current_segment_index = i
         self._current_deviation = nearest_dist
+
+        constant_velocity = 6.0
 
         if nearest_dist < lookahead_distance:
             lookahead_point, i2, t2 = first_point_on_trajectory_intersecting_circle(
@@ -298,7 +354,8 @@ class PurePursuitPlanner:
             # If close, but not within lookahead distance, reacquire the nearest waypoint.
             return np.append(
                 wpts[i, :],
-                waypoints[i, self.conf.wpt_vind]
+                constant_velocity
+                # waypoints[i, self.conf.wpt_vind]
             )
         else:
             # Too far from track

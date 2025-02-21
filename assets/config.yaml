@@ -1,5 +1,5 @@
 # map paths
-map_path: 'assets/example_map'
+map_path: '../assets/example_map'
 map_ext: '.png'
 
 # starting pose for map
@@ -8,7 +8,7 @@ sy: 0.0
 stheta: 1.37079632679
 
 # waypoint file info
-wpt_path: 'assets/example_waypoints.csv'
+wpt_path: '../assets/example_waypoints.csv'
 wpt_delim: ';'
 wpt_rowskip: 3
 
