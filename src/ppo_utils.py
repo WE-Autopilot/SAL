@@ -39,4 +39,4 @@ def ppo_update(actor, critic, actor_optimizer, critic_optimizer, states, actions
     critic_optimizer.zero_grad()
     loss.backward()
     actor_optimizer.step()
-    critic_optimizer.step()
+    critic_optimizer.step()  
