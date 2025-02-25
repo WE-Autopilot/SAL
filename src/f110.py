@@ -17,7 +17,7 @@ config_path = os.path.join(ROOT_DIR, "assets", "config.yaml")
 def render_callback(env_renderer):
     """
     Custom rendering function to ensure waypoints are drawn correctly.
-    Restores behavior from old waypoint_follow.py script.
+    Prevents unnecessary redrawing of waypoints.
     """
 
     e = env_renderer
@@ -35,10 +35,16 @@ def render_callback(env_renderer):
     e.top = top + 400
     e.bottom = bottom - 400
 
-    # Ensure planner waypoints are rendered
-    planner.render_waypoints(env_renderer)
+    # Avoid redundant waypoint rendering
+    if hasattr(planner, "_last_rendered_waypoints") and np.array_equal(planner.waypoints, planner._last_rendered_waypoints):
+        return  # Skip rendering if waypoints haven't changed
+
+    planner.render_waypoints(env_renderer)  # Draw waypoints only if they changed
+
+    planner._last_rendered_waypoints = planner.waypoints.copy()  # Track last drawn waypoints
 
     print("Waypoints rendering called.")  # Debugging log
+
 
 def main(render_on=True, use_csv=False):
     """
@@ -52,24 +58,10 @@ def main(render_on=True, use_csv=False):
 
     global planner
     planner = PurePursuitPlanner(conf, wheelbase=(0.17145 + 0.15875))
-    planner.use_csv = use_csv
 
-    ### Test 1: Load Waypoints from CSV (Global Coordinates)
-    print("Test 1: Loading waypoints from CSV file (global coordinates).")
-    planner.load_waypoints(conf)
-    print("Loaded waypoints:\n", planner.waypoints)
-
-    ### Test 2: Use a (32,) shape vector from the CSV file, converted to global coordinates
-    print("\nTest 2: Using a (32,) shape vector, converted to global coordinates.")
-
-    num_waypoints = 16
-    max_distance = 2.0  # Max distance each waypoint can be from the previous one
-
-    # Generate random relative waypoints (tip-to-tail vectors)
-    random_offsets = np.random.uniform(-max_distance, max_distance, (num_waypoints, 2))
-    
-    # Flatten to (32,) shape as required by set_path
-    rel_wpts = random_offsets.flatten()
+    print("Planner Waypoints:\n", planner.waypoints)
+    rel_wpts = planner.waypoints[:, :2].flatten()
+    print("Relative waypoints:\n", rel_wpts)
     
     scale_factor = 1.0  # No scaling
     rotation_angle = 0.0  # No rotation
@@ -116,6 +108,5 @@ def main(render_on=True, use_csv=False):
 
     print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
 
-
 if __name__ == '__main__':
-    main(render_on=True, use_csv=True)  # Set to False to disable UI rendering
+    main(render_on=True)
