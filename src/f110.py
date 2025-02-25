@@ -100,6 +100,18 @@ def main(render_on=True, use_csv=False):
             planner.tlad,
             planner.vgain
         )
+
+        # Fetch values from the getters
+        latest_steering_angle, latest_speed = planner.get_controls()
+        current_segment_index = planner.get_current_segment_index()
+        path_deviation = planner.get_path_deviation()
+
+        # Print outputs for debugging
+        print(f"Steering Angle: {latest_steering_angle:.3f}, Speed: {latest_speed:.3f}")
+        print(f"Current Segment Index: {current_segment_index}")
+        print(f"Path Deviation: {path_deviation:.3f}")
+
+        # Step the simulation
         obs, step_reward, done, info = env.step(np.array([[steer, speed]]))
         laptime += step_reward
 
