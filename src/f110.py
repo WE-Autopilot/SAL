@@ -46,7 +46,7 @@ def render_callback(env_renderer):
     print("Waypoints rendering called.")  # Debugging log
 
 
-def main(render_on=True, use_csv=False):
+def main(render_on=True):
     """
     Main entry point for running the F110 environment with a chosen planner.
     Set render_on=False to disable rendering and save resources.
@@ -59,18 +59,6 @@ def main(render_on=True, use_csv=False):
     global planner
     planner = PurePursuitPlanner(conf, wheelbase=(0.17145 + 0.15875))
 
-    print("Planner Waypoints:\n", planner.waypoints)
-    rel_wpts = planner.waypoints[:, :2].flatten()
-    print("Relative waypoints:\n", rel_wpts)
-    
-    scale_factor = 1.0  # No scaling
-    rotation_angle = 0.0  # No rotation
-
-    # Set the new path using relative waypoints
-    planner.set_path(rel_wpts, scale=scale_factor, rotation=rotation_angle)
-
-    print("Converted and set waypoints in global coordinates:\n", planner.waypoints)
-
     # Create environment
     env = gym.make('f110_gym:f110-v0',
                    map=conf.map_path,
@@ -81,8 +69,11 @@ def main(render_on=True, use_csv=False):
 
     # Reset environment before rendering
     obs, step_reward, done, info = env.reset(
-        np.array([[conf.sx, conf.sy, conf.stheta]])
-    )
+        np.array([[conf.sx, conf.sy, conf.stheta]]))  # Start car at initial config position
+
+    # Get the car's starting position (this will be updated in loop)
+    car_x = obs['poses_x'][0]
+    car_y = obs['poses_y'][0]
 
     if render_on:
         print("Registering render callback...")  # Debugging log
@@ -93,6 +84,13 @@ def main(render_on=True, use_csv=False):
     start = time.time()
 
     while not done:
+        # Generate a new set of 16 waypoints (assuming they are received from SAL)
+        rel_wpts = planner.waypoints[:, :2].flatten()  # Relative waypoints (N, 2) → (N,)
+        
+        # **Pass current car position into set_path**
+        planner.set_path(rel_wpts, car_x, car_y, scale=1.0, rotation=0.0)
+
+        # Compute control commands
         speed, steer = planner.plan(
             obs['poses_x'][0],
             obs['poses_y'][0],
@@ -101,24 +99,19 @@ def main(render_on=True, use_csv=False):
             planner.vgain
         )
 
-        # Fetch values from the getters
-        latest_steering_angle, latest_speed = planner.get_controls()
-        current_segment_index = planner.get_current_segment_index()
-        path_deviation = planner.get_path_deviation()
-
-        # Print outputs for debugging
-        print(f"Steering Angle: {latest_steering_angle:.3f}, Speed: {latest_speed:.3f}")
-        print(f"Current Segment Index: {current_segment_index}")
-        print(f"Path Deviation: {path_deviation:.3f}")
-
-        # Step the simulation
+        # Update car position after moving
         obs, step_reward, done, info = env.step(np.array([[steer, speed]]))
         laptime += step_reward
+
+        # Update the car's position for the next set_path call
+        car_x = obs['poses_x'][0]
+        car_y = obs['poses_y'][0]
 
         if render_on:
             env.render(mode='human')
 
     print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
+
 
 if __name__ == '__main__':
     main(render_on=True)

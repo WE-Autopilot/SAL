@@ -1,3 +1,4 @@
+# Quick Note: Anything with #! is a change that you need to make to the code to use it with SAL, right now it is configured with the csv.
 import os
 import numpy as np
 
@@ -159,7 +160,7 @@ class PurePursuitPlanner:
     def __init__(self, conf, wheelbase):
         self.wheelbase = wheelbase
         self.conf = conf
-        self.load_waypoints(conf)
+        self.load_waypoints(conf) #! DELETE this line if you are using SAL
         self.max_reacquire = 20.0  # maximum reacquire distance
         self.drawn_waypoints = []
         
@@ -174,8 +175,10 @@ class PurePursuitPlanner:
         
     def load_waypoints(self, conf):
         """
-        Load waypoints as relative and convert them to global only once.
+        Load waypoints from the csv file
+        ! DELETE this if you are using SAL
         """
+
         waypoint_file = os.path.join(ROOT_DIR, "assets", os.path.basename(conf.wpt_path))
 
         if not os.path.exists(waypoint_file):
@@ -192,24 +195,28 @@ class PurePursuitPlanner:
                             f"but expected at least {max(conf.wpt_xind, conf.wpt_yind) + 1}.")
 
         # Extract x and y coordinates
-        rel_waypoints = raw_waypoints[:, [conf.wpt_xind, conf.wpt_yind]]
+        csv_waypoints = raw_waypoints[:, [conf.wpt_xind, conf.wpt_yind]]
 
         # Store all waypoints
-        self.original_waypoints = rel_waypoints
+        self.original_waypoints = csv_waypoints
 
         # Initialize with the first 16 waypoints
-        self.waypoints = rel_waypoints[:16]
+        self.waypoints = csv_waypoints[:16]
         self.waypoint_index = 0  # Track the index of the current batch
 
-        # # Convert to global coordinates
-        # self.waypoints = self.convert_to_global_waypoints(
-        #     rel_waypoints, conf.sx, conf.sy, scale=1.0
-        # )
-
     @staticmethod
-    def convert_to_global_waypoints(rel_waypoints, start_x, start_y, scale=1.0, rotation=1.37079632679):
+    def convert_to_global_waypoints(rel_waypoints, car_x, car_y, scale=1.0, rotation=1.37079632679):
         """
         Convert relative waypoints into global waypoints.
+        
+        Parameters:
+        - rel_waypoints: np.ndarray of shape (N,2), relative waypoints (tip-to-tail)
+        - car_x, car_y: float, current position of the car in global coordinates
+        - scale: float, scaling factor for waypoints
+        - rotation: float, rotation angle in radians (car's heading in global frame)
+        
+        Returns:
+        - global_waypoints: np.ndarray of shape (N,2), global waypoints
         """
         if rel_waypoints.ndim != 2 or rel_waypoints.shape[1] != 2:
             raise ValueError("rel_waypoints must have shape (N,2)")
@@ -217,32 +224,46 @@ class PurePursuitPlanner:
         # Apply scaling
         scaled_waypoints = rel_waypoints * scale
 
-        # Apply cumulative summation to get absolute positions
+        # Apply cumulative summation to get absolute positions in the local frame
         cumsum_waypoints = np.cumsum(scaled_waypoints, axis=0)
 
-        # Apply rotation
+        # Apply rotation using the car's current orientation
         cos_theta, sin_theta = np.cos(rotation), np.sin(rotation)
         rotation_matrix = np.array([[cos_theta, -sin_theta], [sin_theta, cos_theta]])
 
         rotated_waypoints = cumsum_waypoints @ rotation_matrix.T
 
-        # Translate to global coordinates
-        return rotated_waypoints + np.array([start_x, start_y])
+        # Translate to global coordinates based on the car's **current** position
+        return rotated_waypoints + np.array([car_x, car_y])
 
+    def set_path(self, wpts_vector, car_x, car_y, scale=1.0, rotation=0.0):
+        """
+        Accepts a numpy array of relative x, y coordinates from SAL, 
+        reshapes them, converts them to global waypoints, and overrides self.waypoints.
 
-    def set_path(self, wpts_vector, scale=1.0, rotation=0.0):
+        car_x, car_y -> car's **current** global position when this function is called
+        """
+        self.drawn_waypoints.clear()  # Clear old waypoints before setting new ones
 
-        self.drawn_waypoints.clear()
+        # Reshape the flat array to (N,2)
+        rel_waypoints = wpts_vector.reshape((-1, 2))
 
-        # Reshape to (N,2)
-        global_waypoints = wpts_vector.reshape((-1, 2))
+        #! Convert to global waypoints using tip-to-tail transformation - used with SAL only, no need for csv
+        # global_waypoints = self.convert_to_global_waypoints(
+        #     rel_waypoints, 
+        #     car_x, car_y,  # Use dynamic current position
+        #     scale=scale, 
+        #     rotation=rotation
+        # )
 
-        # Store the new waypoints
-        self.waypoints = global_waypoints[:16]
+        # Keep only 16 waypoints at a time
+        self.waypoints = rel_waypoints[:16]  #! change to global_waypoints if you want to use SAL
+
+        print("New waypoints set (from SAL at current car position):\n", self.waypoints)
 
     def render_waypoints(self, e):
         """
-        Render waypoints dynamically.
+        Render waypoints dynamically, ensuring old ones are removed before drawing new ones.
         """
         if self.waypoints is None or self.waypoints.shape[0] == 0:
             return
@@ -251,10 +272,10 @@ class PurePursuitPlanner:
         if self.waypoints.shape[1] < 2:
             raise ValueError(f"Waypoints array must have at least (x, y) columns, but got shape {self.waypoints.shape}")
 
-        # Clear previously drawn waypoints
+        # **Clear previously drawn waypoints**
         for b in self.drawn_waypoints:
             b.delete()
-        self.drawn_waypoints.clear()
+        self.drawn_waypoints.clear()  # Empty the list
 
         # Use only the first two columns (x, y)
         points = self.waypoints[:16, :2]
@@ -262,7 +283,7 @@ class PurePursuitPlanner:
         # Scale for rendering
         scaled_points = 50 * points
 
-        glPointSize(5)  # Increase point size
+        glPointSize(5)  # Increase point size for visibility
 
         # Draw new waypoints
         for i in range(len(points)):
@@ -273,7 +294,10 @@ class PurePursuitPlanner:
                 ('v3f/stream', [scaled_points[i, 0], scaled_points[i, 1], 0.0]),
                 ('c3B/stream', [255, 0, 0])  # Red color
             )
-            self.drawn_waypoints.append(b)
+            self.drawn_waypoints.append(b)  # Store new waypoint objects
+
+        print("Rendered new waypoints and cleared old ones.")
+
 
     def _is_near_last_waypoints(self, position, radius=1.0):
         """
