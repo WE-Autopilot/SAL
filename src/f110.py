@@ -84,7 +84,6 @@ def main(render_on=True):
     start = time.time()
 
     while not done:
-        # Generate a new set of 16 waypoints (assuming they are received from SAL)
         rel_wpts = planner.waypoints[:, :2].flatten()  # Relative waypoints (N, 2) → (N,)
         
         # **Pass current car position into set_path**

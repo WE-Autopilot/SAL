@@ -243,7 +243,6 @@ class PurePursuitPlanner:
 
         car_x, car_y -> car's **current** global position when this function is called
         """
-        self.drawn_waypoints.clear()  # Clear old waypoints before setting new ones
 
         # Reshape the flat array to (N,2)
         rel_waypoints = wpts_vector.reshape((-1, 2))
@@ -259,8 +258,6 @@ class PurePursuitPlanner:
         # Keep only 16 waypoints at a time
         self.waypoints = rel_waypoints[:16]  #! change to global_waypoints if you want to use SAL
 
-        print("New waypoints set (from SAL at current car position):\n", self.waypoints)
-
     def render_waypoints(self, e):
         """
         Render waypoints dynamically, ensuring old ones are removed before drawing new ones.
@@ -268,14 +265,14 @@ class PurePursuitPlanner:
         if self.waypoints is None or self.waypoints.shape[0] == 0:
             return
 
+        # **Clear previously drawn waypoints**
+        for b in self.drawn_waypoints:
+            b.delete()  # Delete previously drawn waypoints from batch
+        self.drawn_waypoints.clear()  # Empty the list
+
         # Ensure waypoints array has at least (x, y)
         if self.waypoints.shape[1] < 2:
             raise ValueError(f"Waypoints array must have at least (x, y) columns, but got shape {self.waypoints.shape}")
-
-        # **Clear previously drawn waypoints**
-        for b in self.drawn_waypoints:
-            b.delete()
-        self.drawn_waypoints.clear()  # Empty the list
 
         # Use only the first two columns (x, y)
         points = self.waypoints[:16, :2]
@@ -297,7 +294,6 @@ class PurePursuitPlanner:
             self.drawn_waypoints.append(b)  # Store new waypoint objects
 
         print("Rendered new waypoints and cleared old ones.")
-
 
     def _is_near_last_waypoints(self, position, radius=1.0):
         """
@@ -330,7 +326,7 @@ class PurePursuitPlanner:
             end_idx = 16
 
         self.waypoints = self.original_waypoints[start_idx:end_idx, :2]
-        print(f"Loaded waypoints {start_idx} to {end_idx}")
+        print(f"Loaded waypoints {start_idx} to {end_idx}:\n", self.waypoints)
 
     def _get_current_waypoint(self, waypoints, lookahead_distance, position, theta):
         """
