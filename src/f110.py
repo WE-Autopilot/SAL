@@ -4,62 +4,97 @@ import gym
 import numpy as np
 import os
 from argparse import Namespace
+from pyglet.gl import GL_POINTS, glPointSize
 
 from f110_gym.envs.base_classes import Integrator
 from pilot import PurePursuitPlanner
+from waypoint_manager import WaypointManager
 
-# Get the absolute path to the root directory
+# Get the absolute path to the project root
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-
-# Load config from YAML using the absolute path
 config_path = os.path.join(ROOT_DIR, "assets", "config.yaml")
+
+# Global variable to store the current set of waypoints for rendering
+current_waypoints_global = None
+# Global list to store drawn waypoint objects for later clearing
+rendered_waypoints = []
 
 def render_callback(env_renderer):
     """
-    Custom rendering function to ensure waypoints are drawn correctly.
-    Prevents unnecessary redrawing of waypoints.
+    Custom render callback that updates the camera and renders waypoints.
+    Uses the global current_waypoints_global variable for drawing.
     """
-
+    global rendered_waypoints
     e = env_renderer
 
-    # Update camera to follow car
+    # Update camera to follow the car
     x = e.cars[0].vertices[::2]
     y = e.cars[0].vertices[1::2]
     top, bottom, left, right = max(y), min(y), min(x), max(x)
     e.score_label.x = left
     e.score_label.y = top - 300
 
-    # Control how much is visible on the screen
     e.left = left - 400
     e.right = right + 400
     e.top = top + 400
     e.bottom = bottom - 400
 
-    # Avoid redundant waypoint rendering
-    if hasattr(planner, "_last_rendered_waypoints") and np.array_equal(planner.waypoints, planner._last_rendered_waypoints):
-        return  # Skip rendering if waypoints haven't changed
+    # Clear previously drawn waypoints
+    for obj in rendered_waypoints:
+        obj.delete()
+    rendered_waypoints = []
 
-    planner.render_waypoints(env_renderer)  # Draw waypoints only if they changed
+    # Render new waypoints using the global current_waypoints_global
+    if current_waypoints_global is not None and current_waypoints_global.shape[0] > 0:
+        points = current_waypoints_global[:, :2]
+        scaled_points = 50 * points  # Scale factor for visualization
+        glPointSize(5)  # Increase point size for clarity
+        for i in range(len(points)):
+            obj = e.batch.add(
+                1,
+                GL_POINTS,
+                None,
+                ('v3f/stream', [scaled_points[i, 0], scaled_points[i, 1], 0.0]),
+                ('c3B/stream', [255, 0, 0])
+            )
+            rendered_waypoints.append(obj)
+    # print("Render callback: waypoints drawn.")
 
-    planner._last_rendered_waypoints = planner.waypoints.copy()  # Track last drawn waypoints
-
-    print("Waypoints rendering called.")  # Debugging log
-
+def compute_callback(planner: PurePursuitPlanner, waypoint_manager: WaypointManager, obs):
+    """
+    Computes control commands and returns the current set of global waypoints.
+    It checks if the vehicle is near the last few waypoints and loads the next batch if needed.
+    """
+    current_position = np.array([obs['poses_x'][0], obs['poses_y'][0]])
+    
+    # Check if the vehicle is near the end of the current waypoint batch.
+    if waypoint_manager.is_near_last_waypoint(current_position):
+        waypoint_manager.load_next_waypoints()
+    
+    # Compute control commands using the current waypoints.
+    speed, steer = planner.plan(
+        obs['poses_x'][0],
+        obs['poses_y'][0],
+        obs['poses_theta'][0],
+        waypoint_manager.waypoints
+    )
+    
+    # Return both the computed commands and the current waypoints for rendering.
+    return speed, steer, waypoint_manager.waypoints
 
 def main(render_on=True):
-    """
-    Main entry point for running the F110 environment with a chosen planner.
-    Set render_on=False to disable rendering and save resources.
-    """
-    # Load config from YAML
+    global current_waypoints_global
+    # Load configuration from YAML.
     with open(config_path) as file:
         conf_dict = yaml.safe_load(file)
     conf = Namespace(**conf_dict)
 
-    global planner
-    planner = PurePursuitPlanner(conf, wheelbase=(0.17145 + 0.15875))
+    global planner, waypoint_manager
+    # Instantiate the PurePursuitPlanner and WaypointManager.
+    planner = PurePursuitPlanner(wheelbase=(0.17145 + 0.15875))
+    waypoint_manager = WaypointManager(conf)
 
-    # Create environment
+    # Create the environment.
     env = gym.make('f110_gym:f110-v0',
                    map=conf.map_path,
                    map_ext=conf.map_ext,
@@ -67,50 +102,28 @@ def main(render_on=True):
                    timestep=0.01,
                    integrator=Integrator.RK4)
 
-    # Reset environment before rendering
-    obs, step_reward, done, info = env.reset(
-        np.array([[conf.sx, conf.sy, conf.stheta]]))  # Start car at initial config position
-
-    # Get the car's starting position (this will be updated in loop)
-    car_x = obs['poses_x'][0]
-    car_y = obs['poses_y'][0]
-
+    # Reset environment and get initial observation.
+    obs, step_reward, done, info = env.reset(np.array([[conf.sx, conf.sy, conf.stheta]]))
+    
     if render_on:
-        print("Registering render callback...")  # Debugging log
+        print("Registering render callback...")
         env.add_render_callback(render_callback)
         env.render(mode='human')
 
     laptime = 0.0
     start = time.time()
 
+    # Main simulation loop.
     while not done:
-        rel_wpts = planner.waypoints[:, :2].flatten()  # Relative waypoints (N, 2) → (N,)
-        
-        # **Pass current car position into set_path**
-        planner.set_path(rel_wpts, car_x, car_y, scale=1.0, rotation=0.0)
-
-        # Compute control commands
-        speed, steer = planner.plan(
-            obs['poses_x'][0],
-            obs['poses_y'][0],
-            obs['poses_theta'][0],
-            planner.tlad,
-            planner.vgain
-        )
-
-        # Update car position after moving
+        speed, steer, current_waypoints = compute_callback(planner, waypoint_manager, obs)
+        # Update the global variable for rendering.
+        current_waypoints_global = current_waypoints
         obs, step_reward, done, info = env.step(np.array([[steer, speed]]))
         laptime += step_reward
-
-        # Update the car's position for the next set_path call
-        car_x = obs['poses_x'][0]
-        car_y = obs['poses_y'][0]
-
         if render_on:
             env.render(mode='human')
 
     print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
-
 
 if __name__ == '__main__':
     main(render_on=True)
