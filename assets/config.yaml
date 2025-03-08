@@ -10,9 +10,8 @@ stheta: 1.37079632679
 # waypoint file info
 wpt_path: '../assets/example_waypoints.csv'
 wpt_delim: ';'
-wpt_rowskip: 3
+wpt_rowskip: 0
 
 # waypoint indices in CSV
 wpt_xind: 1  # x_m
 wpt_yind: 2  # y_m
-# wpt_vind: 5  # vx_mps  (if you want to keep using CSV speeds)
