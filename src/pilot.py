@@ -1,7 +1,5 @@
-# Quick Note: Anything with #! is a change that you need to make to the code to use it with SAL.
 import os
 import numpy as np
-import time
 from numba import njit
 from pyglet.gl import GL_POINTS, glPointSize
 
@@ -35,7 +33,7 @@ def nearest_point_on_trajectory(point, trajectory):
 @njit(fastmath=False, cache=True)
 def first_point_on_trajectory_intersecting_circle(point, radius, trajectory, t=0.0, wrap=False):
     """
-    Given a circle (point, radius) and a piecewise linear trajectory, 
+    Given a circle (point, radius) and a piecewise linear trajectory,
     find the first intersection with the circle.
     """
     start_i = int(t)
@@ -128,17 +126,18 @@ Pure Pursuit Planner Class
 class PurePursuitPlanner:
     """
     This planner computes control commands using a traditional pure pursuit approach,
-    with a constant lookahead and constant velocity per segment.
+    with a constant lookahead distance and a per-segment constant velocity.
     
-    The target waypoint is computed using a fixed lookahead distance, and the speed is a
-    constant value (set as constant_speed).
+    For each segment from Pᵢ to Pᵢ₊₁, the constant speed is computed as:
+         vᵢ = ||Pᵢ₊₁ - Pᵢ|| / T
+    where T is the segment_period (a constant time period).
+    The target waypoint is determined using a fixed lookahead distance.
     """
     def __init__(self, wheelbase):
         self.wheelbase = wheelbase
-        self.tlad = 0.8246       # Constant lookahead distance.
-        self.vgain = 0.9034      # Velocity gain.
-        self.constant_speed = 6.0  # Constant velocity for each segment.
-        self.max_reacquire = 20.0  # Maximum deviation threshold.
+        self.tlad = 1            # Constant lookahead distance.
+        self.vgain = 0.9034           # Velocity gain.
+        self.segment_period = 0.05     # Constant time period T to traverse one segment.
         self._current_segment_index = None
         self._current_deviation = 0.0
 
@@ -153,6 +152,7 @@ class PurePursuitPlanner:
         _, nearest_dist, t, i = nearest_point_on_trajectory(position, wpts)
         self._current_segment_index = i
         self._current_deviation = nearest_dist
+        # Use the fixed lookahead distance to choose the target waypoint.
         if nearest_dist < lookahead_distance:
             target, i2, t2 = first_point_on_trajectory_intersecting_circle(
                 position, lookahead_distance, wpts, i + t, wrap=True
@@ -160,27 +160,48 @@ class PurePursuitPlanner:
             if i2 is None:
                 return None
             return wpts[i2, :]
-        elif nearest_dist < self.max_reacquire:
+        elif nearest_dist < self.tlad * 2:  # If not within lookahead, still use the nearest waypoint.
             return wpts[i, :]
         else:
             return None
 
+    def calculate_segment_speed(self, waypoints):
+        """
+        Computes the constant speed for the current segment.
+        For the segment from Pᵢ to Pᵢ₊₁, the speed is:
+              v = ||Pᵢ₊₁ - Pᵢ|| / segment_period
+        If the current segment index is invalid, returns a default speed.
+        """
+        idx = self._current_segment_index
+        if idx is None or idx >= waypoints.shape[0] - 1:
+            return 0.0
+        p_current = waypoints[idx, :2]
+        p_next = waypoints[idx + 1, :2]
+        segment_distance = np.linalg.norm(p_next - p_current)
+        return segment_distance / self.segment_period
+
     def plan(self, pose_x, pose_y, pose_theta, waypoints):
         """
-        Computes control commands using constant lookahead and constant velocity.
+        Computes control commands:
+          1. Retrieves the target waypoint using a fixed lookahead.
+          2. Computes the constant speed for the current segment.
+          3. Constructs a lookahead point (with the computed speed) and computes the steering angle.
         Returns final speed (scaled by vgain) and steering angle.
         """
         position = np.array([pose_x, pose_y])
         target_waypoint = self.get_current_waypoint(waypoints, position, pose_theta, self.tlad)
         if target_waypoint is None:
-            return self.constant_speed, 0.0
-        # Use the constant speed for the segment.
-        speed = self.constant_speed
+            # If no valid waypoint, command zero steering.
+            return 0.0, 0.0
+        speed = self.calculate_segment_speed(waypoints)
+        # Construct lookahead point as (x, y, speed)
         lookahead_point = np.array([target_waypoint[0], target_waypoint[1], speed])
         steering_angle = get_actuation(pose_theta, lookahead_point, position, self.tlad, self.wheelbase)
         final_speed = self.vgain * speed
+        print(f"Speed: {final_speed:.2f}, Steering: {steering_angle:.2f}")
         return final_speed, steering_angle
-
+    
+    #TODO Look into and implement curvature calculation later on to replace current segment period method.
     # def _compute_curvature(self, waypoints, index):
     #     """
     #     Computes curvature at the given index using three consecutive points.
