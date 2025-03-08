@@ -8,7 +8,8 @@ class WaypointManager:
     def __init__(self, conf):
         # The conf object holds parameters like the file path, delimiter, etc.
         self.conf = conf
-        self.load_waypoints()   #! SAL Change: Delete this call initialization of waypoints with SAL is done in compute_callback()
+        self.waypoints = None
+        # self.load_waypoints()   #! SAL Change: Delete this call initialization of waypoints with SAL is done in compute_callback()
 
     def load_waypoints(self):   #! SAL Change: Delete this.
         """Loads waypoints from the CSV file and initializes the current window."""
@@ -28,35 +29,52 @@ class WaypointManager:
         self.waypoint_index = 0
 
     #! SAL Change: New version of load_next_waypoints() that uses the SAL instead.
-    # def load_next_waypoints(self, current_car_x, current_car_y, current_car_heading):
-    #     # Save the current car pose as attributes for later reference.
-    #     self.current_car_x = current_car_x
-    #     self.current_car_y = current_car_y
-    #     self.current_car_heading = current_car_heading
+    def load_next_waypoints(self, current_car_x, current_car_y, current_car_heading):
+        # Save the current car pose as attributes for later reference.
+        self.current_car_x = current_car_x
+        self.current_car_y = current_car_y
+        self.current_car_heading = current_car_heading
 
-    #     self.sal_wpts = SAL.generate_waypoints()  # Example call to the SAL interface.
+        self.sal_wpts = np.array([
+    [10,  0],
+    [10,  2],
+    [10,  4],
+    [10,  6],
+    [10,  8],
+    [10, 10],
+    [10, 12],
+    [10, 14],
+    [10, 16],
+    [10, 18],
+    [10, 20],
+    [10, 22],
+    [10, 24],
+    [10, 26],
+    [10, 28],
+    [10, 30],
+], dtype=float)
 
-    #     # Convert the SAL-generated waypoints to global coordinates using the set_path method.
-    #     self.set_path(self.sal_wpts, current_car_x, current_car_y, current_car_heading, 0.0625)
+        # Convert the SAL-generated waypoints to global coordinates using the set_path method.
+        self.set_path(self.sal_wpts, current_car_x, current_car_y, current_car_heading, 0.0625)
 
-    #     print(f"Loaded new SAL-generated waypoints at pose: ({current_car_x}, {current_car_y}, {current_car_heading})")
+        print(f"Loaded new SAL-generated waypoints at pose: ({current_car_x}, {current_car_y}, {current_car_heading})")
 
-    def load_next_waypoints(self):
-        """
-        Shifts the waypoint window by 8 to maintain a window of 16 waypoints.
-        If the window exceeds the total, it wraps around.
-        """
-        self.waypoint_index += 8  # Shift by 8.
-        start_idx = self.waypoint_index
-        end_idx = start_idx + 16
-        if end_idx > len(self.original_waypoints):
-            extra = end_idx - len(self.original_waypoints)
-            part1 = self.original_waypoints[start_idx:]
-            part2 = self.original_waypoints[:extra]
-            self.waypoints = np.concatenate((part1, part2), axis=0)
-        else:
-            self.waypoints = self.original_waypoints[start_idx:end_idx, :2]
-        print(f"Loaded waypoints {start_idx} to {end_idx} (wrapped if necessary).")
+    # def load_next_waypoints(self):
+    #     """
+    #     Shifts the waypoint window by 8 to maintain a window of 16 waypoints.
+    #     If the window exceeds the total, it wraps around.
+    #     """
+    #     self.waypoint_index += 8  # Shift by 8.
+    #     start_idx = self.waypoint_index
+    #     end_idx = start_idx + 16
+    #     if end_idx > len(self.original_waypoints):
+    #         extra = end_idx - len(self.original_waypoints)
+    #         part1 = self.original_waypoints[start_idx:]
+    #         part2 = self.original_waypoints[:extra]
+    #         self.waypoints = np.concatenate((part1, part2), axis=0)
+    #     else:
+    #         self.waypoints = self.original_waypoints[start_idx:end_idx, :2]
+    #     print(f"Loaded waypoints {start_idx} to {end_idx} (wrapped if necessary).")
 
     def is_near_last_waypoint(self, position, threshold=1.0):
         """

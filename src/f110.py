@@ -75,14 +75,14 @@ def compute_callback(planner: PurePursuitPlanner, waypoint_manager: WaypointMana
     #! If no waypoints have been loaded yet (e.g. initial call) or if near the end of the current batch,
     #! call load_next_waypoints with the current pose (position and heading) so that SAL can generate new waypoints.
     #! This ensures that even the very first time compute_callback is invoked, the waypoint manager gets updated.
-    # if (waypoint_manager.waypoints is None or len(waypoint_manager.waypoints) == 0) \
-    #    or waypoint_manager.is_near_last_waypoint(current_position):
-    #     waypoint_manager.load_next_waypoints(current_x, current_y, current_theta)
-    
+    if (waypoint_manager.waypoints is None or len(waypoint_manager.waypoints) == 0) \
+       or waypoint_manager.is_near_last_waypoint(current_position):
+        waypoint_manager.load_next_waypoints(current_x, current_y, current_theta)
+
 
     # Check if the vehicle is near the end of the current waypoint batch.
-    if waypoint_manager.is_near_last_waypoint(current_position):
-        waypoint_manager.load_next_waypoints()
+    # if waypoint_manager.is_near_last_waypoint(current_position):
+    #     waypoint_manager.load_next_waypoints()
     
     # Compute control commands using the current waypoints.
     speed, steer = planner.plan(current_x, current_y, current_theta, waypoint_manager.waypoints)
