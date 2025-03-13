@@ -8,19 +8,19 @@ import matplotlib.image as mpimg
 ##########################
 local_waypoints_pixels = np.array([
     [10,  0],
-    [10,  2],
+    [50,  2],
     [10,  4],
-    [10,  6],
+    [80,  6],
     [10,  8],
-    [10, 10],
+    [10, 22],
     [10, 12],
     [10, 14],
     [10, 16],
-    [10, 18],
+    [10, 11],
     [10, 20],
     [10, 22],
     [10, 24],
-    [10, 26],
+    [10, 30],
     [10, 28],
     [10, 30],
 ], dtype=float)
@@ -38,6 +38,8 @@ def convert_local_pixels_to_global(rel_waypoints_px, car_x, car_y, heading_rad, 
     """
     # Scale
     scaled = rel_waypoints_px * scale_m_per_px
+    # print(rel_waypoints_px)
+    # print(scaled)
     # Cumulative sum
     cumsum = np.cumsum(scaled, axis=0)
     # Rotate
@@ -121,7 +123,7 @@ def main():
     # --------------------
     # Subplot 1: Pixel Frame
     # --------------------
-    axes[0].imshow(img, extent=extent_pixels, origin='lower')
+    axes[0].imshow(img, extent=extent_pixels, origin='upper')
     axes[0].scatter(car_px[0], car_px[1], c='magenta', s=60, marker='s', label='Car (pixel coords)')
     axes[0].scatter(local_waypoints_px[:,0], local_waypoints_px[:,1], c='red', label='Local Waypoints (px)')
 
@@ -138,12 +140,47 @@ def main():
     # --------------------
     # Subplot 2: Global Frame
     # --------------------
-    axes[1].imshow(img, extent=extent_global, origin='lower')
+    axes[1].imshow(img, extent=extent_global, origin='upper')
     axes[1].scatter(car_x, car_y, c='magenta', s=60, marker='s', label='Car (global coords)')
     axes[1].scatter(global_waypoints[:,0], global_waypoints[:,1], c='red', label='Global Waypoints (m)')
 
     for i, pt in enumerate(global_waypoints):
         axes[1].annotate(str(i), (pt[0]+0.05, pt[1]+0.05))
+        
+    # --------------------
+    # Add a quiver arrow for the car's heading.
+    # --------------------
+    arrow_length = 0.5  # in meters
+    car_arrow_dx = arrow_length * np.cos(car_heading)
+    car_arrow_dy = arrow_length * np.sin(car_heading)
+    axes[1].quiver(car_x, car_y, car_arrow_dx, car_arrow_dy,
+                   angles='xy', scale_units='xy', scale=1,
+                   color='blue', label='Car Heading')
+
+    # --------------------
+    # Add quiver arrows at each waypoint to show the local path direction.
+    # Compute the direction vectors using the difference between consecutive waypoints.
+    # For the last waypoint, we use the same vector as the previous one.
+    # --------------------
+    wp = global_waypoints  # shorthand
+    # Compute differences between consecutive waypoints.
+    diff = np.diff(wp, axis=0)
+    # Append the last vector to keep the same length.
+    diff = np.vstack((diff, diff[-1, :]))
+
+    # Optionally, you can normalize these vectors to a fixed arrow length:
+    arrow_scale = 0.5  # arrow length in meters
+    norms = np.linalg.norm(diff, axis=1, keepdims=True)
+    # Avoid division by zero.
+    norms[norms == 0] = 1
+    normalized_diff = diff / norms * arrow_scale
+
+    # Plot the waypoint direction arrows (green).
+    axes[1].quiver(wp[:,0], wp[:,1],
+                   normalized_diff[:,0], normalized_diff[:,1],
+                   angles='xy', scale_units='xy', scale=1,
+                   color='green', label='Waypoint Heading')
+
 
     axes[1].set_title("Global Frame (Meters) w/ Same Orientation")
     axes[1].set_xlabel("X (m)")
@@ -154,6 +191,7 @@ def main():
 
     plt.tight_layout()
     plt.show()
+    
 
 if __name__ == "__main__":
     main()
