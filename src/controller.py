@@ -46,7 +46,6 @@ class Controller(AbstractController):
         
         # Compute control commands using the current waypoints.
         speed, steer = self.planner.plan(current_x, current_y, current_theta, self.waypoint_manager.waypoints)
-
         
         # Return both the computed commands and the current waypoints for rendering.
         return speed, steer, self.waypoint_manager.waypoints
