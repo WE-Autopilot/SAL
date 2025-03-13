@@ -35,14 +35,14 @@ class Controller(AbstractController):
         #! If no waypoints have been loaded yet (e.g. initial call) or if near the end of the current batch,
         #! call load_next_waypoints with the current pose (position and heading) so that SAL can generate new waypoints.
         #! This ensures that even the very first time compute_callback is invoked, the waypoint manager gets updated.
-        if (self.waypoint_manager.waypoints is None or len(self.waypoint_manager.waypoints) == 0) \
-        or self.waypoint_manager.is_near_last_waypoint(current_position):
-            self.waypoint_manager.load_next_waypoints(current_x, current_y, current_theta)
+        # if (self.waypoint_manager.waypoints is None or len(self.waypoint_manager.waypoints) == 0) \
+        # or self.waypoint_manager.is_near_last_waypoint(current_position):
+        #     self.waypoint_manager.load_next_waypoints(current_x, current_y, current_theta)
 
 
         # Check if the vehicle is near the end of the current waypoint batch.
-        # if waypoint_manager.is_near_last_waypoint(current_position):
-        #     waypoint_manager.load_next_waypoints()
+        if self.waypoint_manager.is_near_last_waypoint(current_position):
+            self.waypoint_manager.load_next_waypoints()
         
         # Compute control commands using the current waypoints.
         speed, steer = self.planner.plan(current_x, current_y, current_theta, self.waypoint_manager.waypoints)
