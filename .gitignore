@@ -3,3 +3,4 @@ venv
 __pycache__
 
 filter_columns.py
+assets/maps/

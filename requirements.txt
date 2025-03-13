@@ -21,4 +21,3 @@ scipy==1.11.4
 six==1.17.0
 torch==2.5.1
 -e git+https://github.com/WE-Autopilot/f1tenth_gym.git@bdee71de114e160ff920563f3b443e10db20e94c#egg=weap_util&subdirectory=weap_util
-
