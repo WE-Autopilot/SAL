@@ -1,15 +1,22 @@
 import os
 import numpy as np
+from argparse import Namespace
 
 # Define ROOT_DIR so that file paths are relative to the project root.
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 class WaypointManager:
     def __init__(self, conf):
+
+        # Convert it to a namespace if presented as a dictionary.
+        if isinstance(conf, dict):
+            conf = Namespace(**conf)
+
         # The conf object holds parameters like the file path, delimiter, etc.
         self.conf = conf
         self.waypoints = None
-        self.load_waypoints()   #! SAL Change: Delete this call initialization of waypoints with SAL is done in compute_callback()
+        self.waypoint_index = 0
+        # self.load_waypoints()   #! SAL Change: Delete this call initialization of waypoints with SAL is done in compute_callback()
 
     def load_waypoints(self):   #! SAL Change: Delete this.
         """Loads waypoints from the CSV file and initializes the current window."""
@@ -60,28 +67,51 @@ class WaypointManager:
 #         print(f"Loaded new SAL-generated waypoints at pose: ({current_car_x}, {current_car_y}, {current_car_heading})")
 
     def load_next_waypoints(self):
+        # """
+        # Shifts the waypoint window by 8 to maintain a window of 16 waypoints.
+        # If the window exceeds the total, it wraps around.
+        # """
+        # self.waypoint_index += 8  # Shift by 8.
+        # start_idx = self.waypoint_index
+        # end_idx = start_idx + 16
+        # if end_idx > len(self.original_waypoints):
+        #     extra = end_idx - len(self.original_waypoints)
+        #     part1 = self.original_waypoints[start_idx:]
+        #     part2 = self.original_waypoints[:extra]
+        #     self.waypoints = np.concatenate((part1, part2), axis=0)
+        # else:
+        #     self.waypoints = self.original_waypoints[start_idx:end_idx, :2]
+        # print(f"Loaded waypoints {start_idx} to {end_idx} (wrapped if necessary).")
+
         """
-        Shifts the waypoint window by 8 to maintain a window of 16 waypoints.
-        If the window exceeds the total, it wraps around.
+        TEMPORARY HARD CODED WAYPOINTS FOR TESTING
         """
-        self.waypoint_index += 8  # Shift by 8.
-        start_idx = self.waypoint_index
-        end_idx = start_idx + 16
-        if end_idx > len(self.original_waypoints):
-            extra = end_idx - len(self.original_waypoints)
-            part1 = self.original_waypoints[start_idx:]
-            part2 = self.original_waypoints[:extra]
-            self.waypoints = np.concatenate((part1, part2), axis=0)
-        else:
-            self.waypoints = self.original_waypoints[start_idx:end_idx, :2]
-        print(f"Loaded waypoints {start_idx} to {end_idx} (wrapped if necessary).")
+        # Dummy SAL-generated waypoints (in global coordinates or relative, adjust as needed)
+        self.waypoints = np.array([
+            [10.0,  0.0],
+            [10.0,  2.0],
+            [10.0,  4.0],
+            [10.0,  6.0],
+            [10.0,  8.0],
+            [10.0, 10.0],
+            [10.0, 12.0],
+            [10.0, 14.0],
+            [10.0, 16.0],
+            [10.0, 18.0],
+            [10.0, 20.0],
+            [10.0, 22.0],
+            [10.0, 24.0],
+            [10.0, 26.0],
+            [10.0, 28.0],
+            [10.0, 30.0],
+        ], dtype=float)
 
     def is_near_last_waypoint(self, position, threshold=1.0):
         """
         Checks if the vehicle is near the 8th waypoint in the current window.
         This is used to trigger a window shift.
         """
-        if self.waypoints.shape[0] < 8:
+        if self.waypoints is None or self.waypoints.shape[0] < 8:
             return False
         midpoint = self.waypoints[7, :]  # 8th waypoint (0-indexed).
         return np.linalg.norm(position - midpoint) < threshold

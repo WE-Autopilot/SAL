@@ -4,3 +4,4 @@ __pycache__
 
 filter_columns.py
 assets/maps/
+assets/ignoredMaps/

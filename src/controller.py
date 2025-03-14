@@ -9,6 +9,10 @@ from pilot import PurePursuitPlanner
 from waypoint_manager import WaypointManager
 
 class Controller(AbstractController):
+
+    def __init__(self):
+        self.startup()
+
     def startup(self):
         
         ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
