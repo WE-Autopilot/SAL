@@ -7,7 +7,7 @@ import gym
 from waypoint_manager import WaypointManager
 
 # Enable training mode or normal execution
-TRAIN_MODE = True  # Toggle this flag
+TRAIN_MODE = False  # Toggle this flag
 
 def load_yaml(yaml_path):
     """Loads the YAML configuration file."""
@@ -125,7 +125,7 @@ def training_mode():
 def normal_mode():
     """Runs the normal driving mode."""
     controller = Controller()
-    run(controller, "../assets/config.yaml")
+    run(controller, "../assets/config.yaml", False)
 
 if __name__ == "__main__":
     if TRAIN_MODE:

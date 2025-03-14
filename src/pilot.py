@@ -1,7 +1,6 @@
 import os
 import numpy as np
 from numba import njit
-from pyglet.gl import GL_POINTS, glPointSize
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
