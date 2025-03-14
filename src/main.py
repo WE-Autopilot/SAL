@@ -1,11 +1,12 @@
 from argparse import Namespace
 from controller import Controller
-from weap_util.weap_container import run, train_run
+from weap_util.weap_container import run
 import os
 import yaml
 import numpy as np
 import gym
 from waypoint_manager import WaypointManager
+from f110_gym.envs.base_classes import Integrator
 
 # Enable training mode or normal execution
 TRAIN_MODE = True  # Toggle this flag to switch between training and normal execution
@@ -26,6 +27,47 @@ def get_track_names(maps_folder):
             if os.path.exists(yaml_path):
                 tracks.append((track_name, yaml_path, csv_path))
     return tracks
+
+def train_run(model, config_path, sx, sy, stheta, render_on=True):
+    model.startup()
+
+    global current_waypoints_global
+    # Load configuration from YAML.
+    with open(config_path) as file:
+        conf_dict = yaml.safe_load(file)
+    conf = Namespace(**conf_dict)
+
+    # Create the environment.
+    env = gym.make('f110_gym:f110-v0',
+                   map=conf.map_path,
+                   map_ext=conf.map_ext,
+                   num_agents=1,
+                   timestep=0.01,
+                   integrator=Integrator.RK4)
+
+    # Reset environment and get initial observation.
+    # obs, step_reward, done, info = env.reset(np.array([[0, 0, 0]]))
+    obs, step_reward, done, info = env.reset(np.array([[sx, sy, stheta]]))
+
+    if render_on:
+        print("Registering render callback...")
+        env.add_render_callback(_render_callback)
+        env.render(mode='human')
+
+    laptime = 0.0
+    start = time.time()
+
+    # Main simulation loop.
+    while not done:
+        speed, steer, current_waypoints = model.compute(obs)
+        # Update the global variable for rendering.
+        current_waypoints_global = current_waypoints
+        obs, step_reward, done, info = env.step(np.array([[steer, speed]]))
+        laptime += step_reward
+        if render_on:
+            env.render(mode='human')
+
+    print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
 
 #! Combined Implementation
 def training_mode():
