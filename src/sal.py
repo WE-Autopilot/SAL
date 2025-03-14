@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
+import torch as pt
 
 
 class SAL(nn.Module):
@@ -25,7 +26,7 @@ class SAL(nn.Module):
 
         # Fully connected layers using Sequential
         self.fc_layers = nn.Sequential(
-            nn.Linear(1024, 512),
+            nn.Linear(1026, 512),
             nn.ReLU(),
             nn.Linear(512, 256),
             nn.ReLU(),
@@ -34,8 +35,17 @@ class SAL(nn.Module):
             nn.Linear(128, 2 * num_points),
         )
 
-    def forward(self, x):
-        x = self.conv_layers(x)  # Pass through convolutional layers
+    def forward(self, img, pos):
+        x = self.conv_layers(img)  # Pass through convolutional layers
         x = x.mean((-2, -1))  # Global average pooling
+        x = pt.cat((x, pos), dim=-1)
         x = self.fc_layers(x)  # Pass through fully connected layers
         return x
+
+
+if __name__ == "__main__":
+    sal = SAL(16)
+    img = pt.randn(16, 1, 64, 64)
+    pos = pt.randn(16, 2)
+    y = sal(img, pos)
+    print(y.shape)
