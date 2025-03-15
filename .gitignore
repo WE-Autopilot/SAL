@@ -1,7 +1,6 @@
 venv
 .venv
 __pycache__
-
+.venv/
+assets/
 filter_columns.py
-assets/maps/
-assets/ignoredMaps/
