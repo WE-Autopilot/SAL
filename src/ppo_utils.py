@@ -1,6 +1,7 @@
 import torch as pt
 from torch.utils.data import DataLoader, TensorDataset
 from torch.nn.functional import mse_loss
+from tqdm import tqdm
 
 
 # PPO update function remains the same.
@@ -14,7 +15,7 @@ def ppo_update(model, optimizer, images, positions, actions, log_probs_old, loss
     dataset = TensorDataset(images, positions, actions, log_probs_old, losses, advantages)
     dataloader = DataLoader(dataset, batch_size=mini_batch_size, shuffle=shuffle)
 
-    for _ in range(epochs):
+    for _ in tqdm(range(epochs), desc="training...", unit="epoch"):
         for batch_images, batch_positions, batch_actions, batch_log_probs_old, batch_losses, batch_advantages in dataloader:
             dist, values = model(batch_images, batch_positions)
             
@@ -33,3 +34,23 @@ def ppo_update(model, optimizer, images, positions, actions, log_probs_old, loss
             loss.backward()
             optimizer.step()
 
+def angle_accel(vectors):
+    """
+    Calculates the average second-order difference of angles from a batch of 2D vectors.
+
+    Args:
+        vectors (pt.Tensor): Tensor of shape (4, 16, 2) representing 4 batches of 16 2D vectors.
+
+    Returns:
+        pt.Tensor: The average second-order difference of angles.
+    """
+    # 1. Calculate angles
+    angles = pt.atan2(vectors[:, :, 1], vectors[:, :, 0]) # Shape (4, 16)
+
+    # 2. Calculate the second-order difference
+    second_order_diff = angles[:, 2:] - 2 * angles[:, 1:-1] + angles[:, :-2] # Shape (4, 14)
+
+    # 3. Calculate the average of the second-order difference
+    average_second_order_diff = pt.mean(pt.abs(second_order_diff))
+
+    return average_second_order_diff

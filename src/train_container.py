@@ -2,12 +2,14 @@ import time
 import yaml
 import gym
 import numpy as np
+import torch as pt
 
 from time import sleep
 from argparse import Namespace
 from pyglet.gl import GL_POINTS, glPointSize
 
 from f110_gym.envs.base_classes import Integrator
+from ppo_utils import ppo_update
 
 # Global variable to store the current set of waypoints for rendering
 current_waypoints_global = None
@@ -101,7 +103,7 @@ def train_run(model, config_path, sx, sy, stheta, render_on=True):
         # Update the global variable for rendering.
         
         obs, step_reward, done, info = env.step(np.array([[steer, speed]]))
-        sleep(0.01)
+        #sleep(0.1)
         laptime += step_reward
         if render_on:
             env.render(mode='human')
@@ -109,6 +111,7 @@ def train_run(model, config_path, sx, sy, stheta, render_on=True):
         if speed == 0 and frozen_timer > 100:
             done = True
             obs["collisions"][0] = 1
+            print("\n\n\nafk kicked ", end="")
         if speed == 0:
             frozen_timer += 1
         else:
@@ -116,7 +119,17 @@ def train_run(model, config_path, sx, sy, stheta, render_on=True):
             
         speed, steer, current_waypoints = model.compute(obs)
         current_waypoints_global = current_waypoints
+    print("crashed\n\n\n" if obs["collisions"] else "done\n\n\n")
+
+    lidar_scans = pt.cat(model.lidar_scans, dim=0)
+    velocities = pt.cat(model.velocities, dim=0)
+    paths = pt.cat(model.paths, dim=0)
+    log_probs = pt.cat(model.log_probs, dim=0)
+    costs = pt.cat(model.costs, dim=0)
+    advantages = pt.cat(model.advantages, dim=0)
     
-    print(len(model.lidar_scans), len(model.velocities), len(model.paths), len(model.log_probs), len(model.costs), len(model.advantages))
+    print(lidar_scans.shape, velocities.shape, paths.shape, log_probs.shape, costs.shape, advantages.shape)
+    ppo_update(model.sal, model.optimizer, lidar_scans, velocities, paths, log_probs.detach(), costs.detach(), advantages.detach(), epochs=8)
+    #print(len(model.lidar_scans), len(model.velocities), len(model.paths), len(model.log_probs), len(model.costs), len(model.advantages))
     
     # print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)

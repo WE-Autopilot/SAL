@@ -18,13 +18,13 @@ class WaypointManager:
 
         # print(lidar[None, None, ...].shape, current_vel[None, ...].shape)
 
-        dist, value = self.sal(pt.tensor(lidar[None, None, ...], dtype=pt.float32), pt.tensor(current_vel[None, ...], dtype=pt.float32))
+        dist, value = self.sal(lidar, current_vel)
 
         path = dist.sample()
         # print(path)
         log_probs = dist.log_prob(path)
         # Convert the SAL-generated waypoints to global coordinates using the set_path method.
-        self.set_path(10*path.numpy()[0], current_car_x, current_car_y, current_car_heading)
+        self.set_path(path.numpy()[0], current_car_x, current_car_y, current_car_heading)
 
         # Calculate distance to the next waypoint by taking the global coordinate of the next wp and subtracting the current car pos from it.
         self.distance_to_wp = np.linalg.norm(self.waypoints[0, :] - np.array([current_car_x, current_car_y]))

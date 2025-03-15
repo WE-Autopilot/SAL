@@ -40,7 +40,7 @@ class SAL(nn.Module):
 
     def forward(self, img, pos):
         x = self.conv_layers(img)  # Pass through convolutional layers
-        x = x.mean((-2, -1))  # Global average pooling
+        x = x.mean((-2, -1)) * 100  # Global average pooling
         x = pt.cat((x, pos), dim=-1)
         x = self.fc_layers(x)  # Pass through fully connected layers
         mean = x[:, :2 * self.num_points]

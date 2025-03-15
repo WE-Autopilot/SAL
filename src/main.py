@@ -33,21 +33,22 @@ def get_track_names(maps_folder):
 def training_mode():
     """Runs the training mode."""
     controller = Controller()
-    tracks = get_track_names("../assets/maps")
+    tracks = get_track_names("../assets/maps")[:1]
 
-    for track_name, yaml_path, csv_path in tracks:
-        print(f"\nStarting training on track: {track_name}")
+    while 1:
+        for track_name, yaml_path, csv_path in tracks:
+            print(f"\nStarting training on track: {track_name}")
 
-        waypoints = np.loadtxt(csv_path, delimiter=";", skiprows=1, usecols=[0,1,3])[::32]
-        with open(yaml_path) as file:
-            conf_dict = yaml.safe_load(file)
+            waypoints = np.loadtxt(csv_path, delimiter=";", skiprows=1, usecols=[0,1,3])[::32]
+            with open(yaml_path) as file:
+                conf_dict = yaml.safe_load(file)
 
-        for sx, sy, stheta in waypoints:
-            conf_dict["sx"] = sx
-            conf_dict["sy"] = sy
-            conf_dict["stheta"] = stheta
-            controller.setConf(conf_dict)
-            train_run(controller, yaml_path, sx, sy, stheta, True)
+            for sx, sy, stheta in waypoints:
+                conf_dict["sx"] = sx
+                conf_dict["sy"] = sy
+                conf_dict["stheta"] = stheta
+                controller.setConf(conf_dict)
+                train_run(controller, yaml_path, sx, sy, stheta, True)
 
 def normal_mode():
     """Runs the normal driving mode."""
