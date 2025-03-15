@@ -1,0 +1,17 @@
+# map paths
+map_path: '../assets/example_map'
+map_ext: '.png'
+
+# starting pose for map
+sx: 0.7
+sy: 0.0
+stheta: 1.37079632679
+
+# waypoint file info
+wpt_path: '../assets/example_waypoints.csv'
+wpt_delim: ';'
+wpt_rowskip: 0
+
+# waypoint indices in CSV
+wpt_xind: 1  # x_m
+wpt_yind: 2  # y_m
