@@ -1,2 +1,5 @@
 venv
 __pycache__
+.venv/
+assets/
+filter_columns.py
