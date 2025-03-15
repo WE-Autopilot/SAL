@@ -129,7 +129,8 @@ def train_run(model, config_path, sx, sy, stheta, render_on=True):
     advantages = pt.cat(model.advantages, dim=0)
     
     print(lidar_scans.shape, velocities.shape, paths.shape, log_probs.shape, costs.shape, advantages.shape)
-    ppo_update(model.sal, model.optimizer, lidar_scans, velocities, paths, log_probs.detach(), costs.detach(), advantages.detach(), epochs=8)
+    print(lidar_scans.isnan().any(), velocities.isnan().any(), paths.isnan().any(), log_probs.isnan().any(), costs.isnan().any(), advantages.isnan().any())
+    ppo_update(model.sal, model.optimizer, lidar_scans, velocities, paths, log_probs.detach(), costs.detach(), advantages.detach(), mini_batch_size=16, epochs=8)
     #print(len(model.lidar_scans), len(model.velocities), len(model.paths), len(model.log_probs), len(model.costs), len(model.advantages))
     
     # print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)

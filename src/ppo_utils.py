@@ -12,10 +12,12 @@ def ppo_update(model, optimizer, images, positions, actions, log_probs_old, loss
     advantages = advantages.detach()
 
 
+    print(losses)
     dataset = TensorDataset(images, positions, actions, log_probs_old, losses, advantages)
     dataloader = DataLoader(dataset, batch_size=mini_batch_size, shuffle=shuffle)
 
-    for _ in tqdm(range(epochs), desc="training...", unit="epoch"):
+    pbar = tqdm(range(epochs), desc="training...", unit="epoch")
+    for _ in pbar:
         for batch_images, batch_positions, batch_actions, batch_log_probs_old, batch_losses, batch_advantages in dataloader:
             dist, values = model(batch_images, batch_positions)
             
@@ -25,10 +27,12 @@ def ppo_update(model, optimizer, images, positions, actions, log_probs_old, loss
             ratio = pt.exp(batch_log_probs - batch_log_probs_old).mean(dim=-1)
             surr1 = ratio * batch_advantages
             surr2 = pt.clamp(ratio, 1.0 - clip_param, 1.0 + clip_param) * batch_advantages
-            policy_reward = pt.min(surr1, surr2).mean()
+            policy_loss = pt.min(surr1, surr2).mean()
             
             value_loss = (batch_losses - values).pow(2).mean()
-            loss = -policy_reward + value_loss_coef * value_loss - entropy_coef * entropy
+            loss = policy_loss + value_loss_coef * value_loss - entropy_coef * entropy
+            pbar.set_postfix(L=f"{loss.item():.4f}")
+            #print(entropy, policy_loss, value_loss, loss)
             
             optimizer.zero_grad()
             loss.backward()

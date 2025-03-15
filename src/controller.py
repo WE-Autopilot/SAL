@@ -16,7 +16,7 @@ class Controller(AbstractController):
         
     def startup(self):
         self.planner = PurePursuitPlanner(wheelbase=(0.17145 + 0.15875))
-        self.sal = SAL()
+        self.sal = SAL(num_points=16, max_std=10)
         self.waypoint_manager = WaypointManager(self.sal, self.conf_dict)
         self.optimizer = AdamW(self.sal.parameters(), lr=1e-4)
 
@@ -42,6 +42,7 @@ class Controller(AbstractController):
         Computes control commands and returns the current set of global waypoints.
         It checks if the vehicle is near the last few waypoints and loads the next batch if needed.
         """
+
         # Extract the current car pose from the observation
         current_x = obs['poses_x'][0]
         current_y = obs['poses_y'][0]
@@ -65,8 +66,8 @@ class Controller(AbstractController):
             if len(self.speeds) == 0:
                 self.speeds.append(0)
 
-            length = pt.linalg.norm(self.paths[-1].view(1, -1, 2), dim=-1).sum()
-            accel = self.paths[-1][:, ::2].diff().mean()
+            length = pt.linalg.norm(self.paths[-1][:, -2:] - self.paths[-1][:, :2], dim=-1).mean()
+            accel = angle_accel(self.paths[-1].view(1, -1, 2))
             #print(length, accel)
             self.costs.append(pt.tensor([self.a*np.array(self.deviations).mean() - self.b*length - self.c*accel + self.d*crashed], dtype=pt.float32))
             # print("Costs updated", self.costs[-1])
