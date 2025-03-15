@@ -1,12 +1,15 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch as pt
+from torch.distributions import Normal
 
 
 class SAL(nn.Module):
-    def __init__(self, num_points=16):
+    def __init__(self, num_points=16, min_std=1e-4, max_std=2):
         super(SAL, self).__init__()
         self.num_points = num_points
+        self.min_std = min_std
+        self.max_std = max_std
 
         # Convolutional layers using Sequential
         self.conv_layers = nn.Sequential(
@@ -32,7 +35,7 @@ class SAL(nn.Module):
             nn.ReLU(),
             nn.Linear(256, 128),
             nn.ReLU(),
-            nn.Linear(128, 2 * num_points),
+            nn.Linear(128, 4 * num_points + 1),
         )
 
     def forward(self, img, pos):
@@ -40,12 +43,16 @@ class SAL(nn.Module):
         x = x.mean((-2, -1))  # Global average pooling
         x = pt.cat((x, pos), dim=-1)
         x = self.fc_layers(x)  # Pass through fully connected layers
-        return x
+        mean = x[:, :2 * self.num_points]
+        std = F.sigmoid(x[:, 2 * self.num_points:-1]) * self.max_std + self.min_std
+        dist = Normal(mean, std)
+        value = x[:, -1]
+        return dist, value
 
 
 if __name__ == "__main__":
     sal = SAL(16)
-    img = pt.randn(16, 1, 64, 64)
+    img = pt.randn(16, 1, 512, 512)
     pos = pt.randn(16, 2)
-    y = sal(img, pos)
-    print(y.shape)
+    d, v = sal(img, pos)
+    print(d.sample().shape, v.shape)
