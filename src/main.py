@@ -1,13 +1,13 @@
-from argparse import Namespace
-from controller import Controller
-from weap_util.weap_container import run, train_run
 import os
 import yaml
+
 import numpy as np
-import gym
-from f110_gym.envs.base_classes import Integrator
-from waypoint_manager import WaypointManager
 from PIL import Image
+
+from controller import Controller
+from weap_util.weap_container import run
+from train_container import train_run
+from f110_gym.envs.base_classes import Integrator
 
 # Monkey-patch PIL.Image.open so that it only returns the red channel (i.e. a single-channel image)
 _orig_open = Image.open
@@ -43,12 +43,12 @@ def training_mode():
         waypoints = np.loadtxt(csv_path, delimiter=";", skiprows=1, usecols=[0,1,3])[::32]
         with open(yaml_path) as file:
             conf_dict = yaml.safe_load(file)
-            conf = Namespace(**conf_dict)
-        
+
         for sx, sy, stheta in waypoints:
             conf_dict["sx"] = sx
             conf_dict["sy"] = sy
             conf_dict["stheta"] = stheta
+            controller.setConf(conf_dict)
             train_run(controller, yaml_path, sx, sy, stheta, True)
 
 def normal_mode():

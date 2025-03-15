@@ -135,7 +135,6 @@ class PurePursuitPlanner:
     def __init__(self, wheelbase):
         self.wheelbase = wheelbase
         self.tlad = 1                   # Constant lookahead distance. 
-        #? Might have to implement dynamic lookahead distance to account for speed increase with segment length.
         self.vgain = 0.9034             # Velocity gain.
         self.segment_period = 0.05      # Constant time period T to traverse one segment.
         self._current_segment_index = None
