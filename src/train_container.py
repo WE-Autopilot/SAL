@@ -2,6 +2,8 @@ import time
 import yaml
 import gym
 import numpy as np
+
+from time import sleep
 from argparse import Namespace
 from pyglet.gl import GL_POINTS, glPointSize
 
@@ -80,25 +82,41 @@ def train_run(model, config_path, sx, sy, stheta, render_on=True):
     # Check for termination: either a crash or when 1 lap is completed.
     if done or lap_count >= 1:
         if lap_count >= 1:
-            print("1 lap completed; moving to next starting waypoint.")
             done = True
 
     if render_on:
-        print("Registering render callback...")
+        # print("Registering render callback...")
         env.add_render_callback(_render_callback)
         env.render(mode='human')
 
     laptime = 0.0
     start = time.time()
 
+    speed, steer = 0, 0
+
+    frozen_timer = 0.0
+
     # Main simulation loop.
     while not done:
-        speed, steer, current_waypoints = model.compute(obs)
         # Update the global variable for rendering.
-        current_waypoints_global = current_waypoints
+        
         obs, step_reward, done, info = env.step(np.array([[steer, speed]]))
+        sleep(0.01)
         laptime += step_reward
         if render_on:
             env.render(mode='human')
 
-    print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
+        if speed == 0 and frozen_timer > 100:
+            done = True
+            obs["collisions"][0] = 1
+        if speed == 0:
+            frozen_timer += 1
+        else:
+            frozen_timer = 0
+            
+        speed, steer, current_waypoints = model.compute(obs)
+        current_waypoints_global = current_waypoints
+    
+    print(len(model.lidar_scans), len(model.velocities), len(model.paths), len(model.log_probs), len(model.costs), len(model.advantages))
+    
+    # print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)

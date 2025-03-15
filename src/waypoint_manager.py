@@ -6,7 +6,7 @@ class WaypointManager:
         # The conf object holds parameters like the file path, delimiter, etc.
         self.conf_dict = conf_dict
         self.sal = sal
-        self.waypoints = None
+        self.waypoints = []
 
         self.distance_to_wp = 0
 
@@ -16,21 +16,22 @@ class WaypointManager:
         self.current_car_y = current_car_y
         self.current_car_heading = current_car_heading
 
-        print(lidar[None, None, ...].shape, current_vel[None, ...].shape)
+        # print(lidar[None, None, ...].shape, current_vel[None, ...].shape)
 
         dist, value = self.sal(pt.tensor(lidar[None, None, ...], dtype=pt.float32), pt.tensor(current_vel[None, ...], dtype=pt.float32))
-        
+
+        path = dist.sample()
+        # print(path)
+        log_probs = dist.log_prob(path)
+        # Convert the SAL-generated waypoints to global coordinates using the set_path method.
+        self.set_path(10*path.numpy()[0], current_car_x, current_car_y, current_car_heading)
+
         # Calculate distance to the next waypoint by taking the global coordinate of the next wp and subtracting the current car pos from it.
         self.distance_to_wp = np.linalg.norm(self.waypoints[0, :] - np.array([current_car_x, current_car_y]))
 
-        path = dist.sample().numpy()[0]
-        # print(path)
-        
-        # Convert the SAL-generated waypoints to global coordinates using the set_path method.
-        self.set_path(10*path, current_car_x, current_car_y, current_car_heading)
-
         # print(f"Loaded new SAL-generated waypoints at pose: ({current_car_x}, {current_car_y}, {current_car_heading})")
-
+        return path, log_probs, value, self.distance_to_wp
+    
     def is_near_last_waypoint(self, position, threshold=1.0):
         """
         Checks if the vehicle is near the 8th waypoint in the current window.
@@ -59,7 +60,7 @@ class WaypointManager:
         # 3. Rotate by the car's heading.
         # 4. Translate by the car's global position.
         global_waypoints = self.convert_to_global_waypoints(rel_waypoints, car_x, car_y, rotation, self.conf_dict["resolution"])
-        print("global coordinates", global_waypoints)
+        # print("global coordinates", global_waypoints)
         # Use only the first 16 waypoints.
         self.waypoints = global_waypoints[:16]
 

@@ -197,7 +197,7 @@ class PurePursuitPlanner:
         lookahead_point = np.array([target_waypoint[0], target_waypoint[1], speed])
         steering_angle = get_actuation(pose_theta, lookahead_point, position, self.tlad, self.wheelbase)
         final_speed = self.vgain * speed
-        print(f"Speed: {final_speed:.2f}, Steering: {steering_angle:.2f}")
+        # print(f"Speed: {final_speed:.2f}, Steering: {steering_angle:.2f}")
         return final_speed, steering_angle
     
     #TODO Look into and implement curvature calculation later on to replace current segment period method.
