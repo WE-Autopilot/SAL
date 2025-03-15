@@ -7,7 +7,6 @@ from PIL import Image
 from controller import Controller
 from weap_util.weap_container import run
 from train_container import train_run
-from f110_gym.envs.base_classes import Integrator
 
 # Monkey-patch PIL.Image.open so that it only returns the red channel (i.e. a single-channel image)
 _orig_open = Image.open
@@ -34,7 +33,6 @@ def get_track_names(maps_folder):
 def training_mode():
     """Runs the training mode."""
     controller = Controller()
-    
     tracks = get_track_names("../assets/maps")
 
     for track_name, yaml_path, csv_path in tracks:
@@ -54,7 +52,7 @@ def training_mode():
 def normal_mode():
     """Runs the normal driving mode."""
     controller = Controller()
-    run(controller, "../assets/config.yaml", True)
+    run(controller, "../assets/maps/map0.yaml", True)
 
 if __name__ == "__main__":
     if TRAIN_MODE:

@@ -8,15 +8,21 @@ class WaypointManager:
         self.sal = sal
         self.waypoints = None
 
+        self.distance_to_wp = 0
+
     def load_next_waypoints(self, current_car_x, current_car_y, current_car_heading, lidar, current_vel):
         # Save the current car pose as attributes for later reference.
         self.current_car_x = current_car_x
         self.current_car_y = current_car_y
         self.current_car_heading = current_car_heading
-        
+
         print(lidar[None, None, ...].shape, current_vel[None, ...].shape)
 
         dist, value = self.sal(pt.tensor(lidar[None, None, ...], dtype=pt.float32), pt.tensor(current_vel[None, ...], dtype=pt.float32))
+        
+        # Calculate distance to the next waypoint by taking the global coordinate of the next wp and subtracting the current car pos from it.
+        self.distance_to_wp = np.linalg.norm(self.waypoints[0, :] - np.array([current_car_x, current_car_y]))
+
         path = dist.sample().numpy()[0]
         # print(path)
         

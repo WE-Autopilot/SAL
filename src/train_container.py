@@ -52,7 +52,7 @@ def _render_callback(env_renderer):
             )
             rendered_waypoints.append(obj)
     # print("Render callback: waypoints drawn.")
-            
+
 def train_run(model, config_path, sx, sy, stheta, render_on=True):
     model.startup()
 
@@ -73,6 +73,15 @@ def train_run(model, config_path, sx, sy, stheta, render_on=True):
     # Reset environment and get initial observation.
     # obs, step_reward, done, info = env.reset(np.array([[0, 0, 0]]))
     obs, step_reward, done, info = env.reset(np.array([[sx, sy, stheta]]))
+    # Retrieve lap count for the ego agent.
+    # The environment's lap_counts is assumed to be a list or array (one entry per agent).
+    lap_count = env.lap_counts[env.ego_idx] if hasattr(env, "lap_counts") else 0
+    
+    # Check for termination: either a crash or when 1 lap is completed.
+    if done or lap_count >= 1:
+        if lap_count >= 1:
+            print("1 lap completed; moving to next starting waypoint.")
+            done = True
 
     if render_on:
         print("Registering render callback...")
